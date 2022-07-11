@@ -12,12 +12,12 @@ parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Mo
 parser.add_argument('--network',
                     type = int,
                     choices={"0", "1"},
-                    default="1",
+                    default="0",
                     help ='Neural network topology which the dataset will be prepared for (0. MLP or 1. LSTM).')
   
 parser.add_argument('--layers_list',
                     nargs='+', 
-                    default=[120],
+                    default=[512, 128, 64, 32],
                     help ='Number of neurons each hidden layer will have')
 
 

@@ -1,9 +1,10 @@
 #%%
-from utils import mae_multi, root_mean_square_error, standard_deviation_error
+from utils import mae_multi, root_mean_square_error, standard_deviation_error, init_gpus
 import pandas as pd
 import argparse, json, datetime, os
 import tensorflow as tf
 
+#init_gpus()
 #%%
 # Initializing Parser
 parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Model Training')
@@ -17,7 +18,7 @@ parser.add_argument('--network',
   
 parser.add_argument('--layers_list',
                     nargs='+', 
-                    default=[120],
+                    default=[512, 128, 64, 32],
                     help ='Number of neurons each hidden layer will have')
 
 
@@ -89,6 +90,7 @@ if network == 'mlp':
             model.add(tf.keras.layers.Dense(units = layers_list[i], activation='relu', input_dim=inputDim))
         else:
             model.add(tf.keras.layers.Dense(units = layers_list[i], activation='relu'))
+            #model.add(tf.keras.layers.Dropout(0.2))
         save_path = save_path + "["+str(layers_list[i])+"]"
 else:
     for i in range(len(layers_list)):
@@ -114,7 +116,7 @@ for i in range(len(input_labels)):
 
 
 # Compilling the network according to the loss_metric
-opt = tf.keras.optimizers.Adam(lr=0.001)
+opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 model.compile(optimizer = opt, loss = 'mean_absolute_error', metrics=[mae_multi, standard_deviation_error, root_mean_square_error])  
 es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 20, verbose = 1)
@@ -168,3 +170,5 @@ with open(my_dir+f'/regressor_{network}'+save_path+'.json', 'w') as json_file:
     json_file.write(model_json)
 
 print("training finished!")
+
+# %%
