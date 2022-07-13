@@ -23,7 +23,6 @@ parser.add_argument('--input_labels',
                     help ='Input features that will be used to make predictions. (TIMESTAMP, Radiacao_Avg,Temp_Cel_Avg, Temp_Amb_Avg,Tensao_S1_Avg,Corrente_S1_Avg, Potencia_S1_Avg, Tensao_S2_Avg, Corrente_S2_Avg, Potencia_S2_Avg, Potencia_FV_Avg, Demanda_Avg,FP_FV_Avg,Tensao_Rede_Avg')
 
 parser.add_argument('--output_labels',
-                    type = int,
                     nargs='+', 
                     default=["Potencia_FV_Avg"],
                     help ='Output features to be predicted. (TIMESTAMP, Radiacao_Avg, Temp_Cel_Avg, Temp_Amb_Avg, Tensao_S1_Avg, Corrente_S1_Avg, Potencia_S1_Avg, Tensao_S2_Avg, Corrente_S2_Avg, Potencia_S2_Avg, Potencia_FV_Avg, Demanda_Avg, FP_FV_Avg, Tensao_Rede_Avg')
@@ -94,7 +93,7 @@ def build_lstm_model(hp):
     
     model.add(tf.keras.layers.LSTM(hp.Int('input_unit',min_value=32,max_value=256,step=32), activation = 'tanh', return_sequences=True, input_shape=(input_training.shape[1], input_training.shape[2])))
     
-    for i in range(hp.Int('n_layers', 1, 2)):
+    for i in range(hp.Int('n_layers', 1, 3)):
         model.add(tf.keras.layers.LSTM(hp.Int(f'lstm_{i}_units',min_value=32,max_value=256,step=32), activation = 'tanh', return_sequences=True))
     
     model.add(tf.keras.layers.LSTM(hp.Int('last_layer_units',min_value=32,max_value=256,step=32), activation = 'tanh'))
@@ -113,7 +112,7 @@ if network == 'mlp':
     tuner = kt.BayesianOptimization(build_mlp_model, objective='val_mean_absolute_error', max_trials=20, executions_per_trial=1,
                      directory='./logs/tuning/',project_name='mlp_param')
 else:
-    tuner = kt.BayesianOptimization(build_lstm_model, objective='val_mean_absolute_error', max_trials=20, executions_per_trial=1,
+    tuner = kt.BayesianOptimization(build_lstm_model, objective='val_mean_absolute_error', max_trials=15, executions_per_trial=1,
                      directory='./logs/tuning/',project_name='lstm_param')
 
 es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 10, verbose = 1)
@@ -123,7 +122,7 @@ es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, pat
 tuner.search_space_summary()
 
 #%%
-tuner.search(input_training, output_training,epochs=128, batch_size = 512,
+tuner.search(input_training, output_training,epochs=128, batch_size = 32,
      validation_split=0.2, callbacks=[es], verbose=1)
 
 #%%

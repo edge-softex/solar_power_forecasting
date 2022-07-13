@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import argparse,joblib
 import tensorflow as tf
+from keras.models import load_model
 #%%
 # Initializing Parser
 parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Model Test')
@@ -17,7 +18,7 @@ parser.add_argument('--network',
   
 parser.add_argument('--layers_list',
                     nargs='+', 
-                    default=[512, 128, 64, 32],
+                    default=[60],
                     help ='Number of neurons each hidden layer will have')
 
 
@@ -80,6 +81,7 @@ for i in range(len(layers_list)):
 save_path = save_path +"["+str(n_steps_in) + "]"+"["+str(n_steps_out) + "]"
 for i in range(len(input_labels)):
     save_path = save_path + "["+str(input_labels[i]) + "]" 
+
 # Openning the file which contains the network model
 nn_file = open(f'./../db/saves/{network}/regressor_{network}'+save_path+'.json', 'r')
 nn_structure = nn_file.read()
@@ -88,6 +90,7 @@ nn_file.close()
 model = tf.keras.models.model_from_json(nn_structure)
 # Reading the weights the putting them  in the network model
 model.load_weights(f'./../db/saves/{network}/pesos_{network}'+save_path+'.h5')
+
 
 predictions = model.predict(input_test)
 

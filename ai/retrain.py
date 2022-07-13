@@ -6,7 +6,6 @@ import tensorflow as tf
 
 init_gpus()
 #%%
-# Initializing Parser
 parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Model Training')
   
 # Adding Argument
@@ -58,14 +57,11 @@ input_labels = args.input_labels
 output_labels = args.output_labels
 n_steps_in = args.input_steps
 n_steps_out = args.output_steps
-
 #%%
-#Training the model with all the training data
-#Reading the training input data
+#TEMPORARIO
 input_training = pd.read_csv(r'./../db/data/trainingInputData.csv')
-#Getting the column values
 input_training = input_training.values
-#Reading the training output data
+
 output_training = pd.read_csv(r'./../db/data/trainingOutputData.csv')
 output_training = output_training.values
 
@@ -75,53 +71,32 @@ if network == 'lstm':
     input_training = input_training.reshape(input_training.shape[0], int(input_training.shape[1]/in_l), in_l)
     output_training = output_training.reshape(output_training.shape[0], int(output_training.shape[1]/out_l), out_l)
 
-
 #%%
 save_path = ""
 
-inputDim = n_steps_in * len(input_labels) 
-#Define MLP model
-model = tf.keras.models.Sequential()
-
-if network == 'mlp':
-    for i in range(len(layers_list)):
-        if i == 0:     
-            model.add(tf.keras.layers.Dense(units = layers_list[i], activation='relu', input_dim=inputDim))
-        else:
-            model.add(tf.keras.layers.Dense(units = layers_list[i], activation='relu'))
-            #model.add(tf.keras.layers.Dropout(0.2))
-        save_path = save_path + "["+str(layers_list[i])+"]"
-else:
-    for i in range(len(layers_list)):
-        if len(layers_list) == 1:
-            model.add(tf.keras.layers.LSTM(units = layers_list[i], activation='tanh', input_shape=(input_training.shape[1], input_training.shape[2])))
-        elif len(layers_list) > 1 and i == 0:     
-            model.add(tf.keras.layers.LSTM(units = layers_list[i], activation='tanh', input_shape=(input_training.shape[1], input_training.shape[2]), return_sequences=True))
-        elif len(layers_list) > 1 and i == (len(layers_list)-1):
-            model.add(tf.keras.layers.LSTM(units = layers_list[i], activation='tanh'))
-        else:
-            model.add(tf.keras.layers.LSTM(units = layers_list[i], activation='tanh', return_sequences = True))
-        save_path = save_path + "["+str(layers_list[i])+"]"
-
-# Output layer
-model.add(tf.keras.layers.Dense(units = n_steps_out, activation = 'linear'))    
-    
-    
-
+for i in range(len(layers_list)):
+    save_path = save_path + "["+str(layers_list[i])+"]"
 save_path = save_path +"["+str(n_steps_in) + "]"+"["+str(n_steps_out) + "]"
-
 for i in range(len(input_labels)):
-            save_path = save_path +"["+str(input_labels[i]) + "]"
+    save_path = save_path + "["+str(input_labels[i]) + "]" 
 
-
+# Openning the file which contains the network model
+nn_file = open(f'./../db/saves/{network}/regressor_{network}'+save_path+'.json', 'r')
+nn_structure = nn_file.read()
+nn_file.close()
+# Getting the network structure
+model = tf.keras.models.model_from_json(nn_structure)
+# Reading the weights the putting them  in the network model
+model.load_weights(f'./../db/saves/{network}/pesos_{network}'+save_path+'.h5')
+#%%
 # Compilling the network according to the loss_metric
 opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 model.compile(optimizer = opt, loss = 'mean_absolute_error', metrics=[mae_multi, standard_deviation_error, root_mean_square_error])  
-es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 20, verbose = 1)
+es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 10, verbose = 1)
 
 # Reduce the learnning rate when the metric stop improving.
-rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 10, verbose = 1)
+rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 5, verbose = 1)
 
 my_dir = os.path.join(".","..","db","saves",f"{network}")
 check_folder = os.path.isdir(my_dir)
@@ -135,12 +110,11 @@ mcp =  tf.keras.callbacks.ModelCheckpoint(filepath=my_dir+f'/pesos_{network}'+sa
 log_dir = f"logs/{network}/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
-#%%
 #training and storing the history
 history = model.fit(x = input_training,
                         y= output_training,
                         validation_split=0.2, 
-                        epochs = 128,
+                        epochs = 50,
                         batch_size = 512,
                         callbacks = [es,rlr,mcp,tb_callback])
 model_json = model.to_json()
@@ -163,11 +137,10 @@ check_folder = os.path.isdir(my_dir)
 if not check_folder:
     os.makedirs(check_folder)
 
-with open(my_dir+f'/history_{network}'+save_path, 'w') as json_file:
+with open(my_dir+f'/history_{network}'+save_path+'_retrain_'+ datetime.datetime.now().strftime("%Y%m%d-%H%M%S"), 'w') as json_file:
     json_file.write(j_hist)
 with open(my_dir+f'/regressor_{network}'+save_path+'.json', 'w') as json_file:
     json_file.write(model_json)
 
 print("training finished!")
-
 # %%
