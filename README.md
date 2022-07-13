@@ -21,7 +21,7 @@ python generate_dataset.py --layers_list 120 --input_labels "Radiacao_Avg" "Temp
 ```
 cd ./ai
 
-python test.py --network 0 --layers_list 120 --input_labels "Radiacao_Avg" "Temp_Cel_Avg" "Potencia_FV_Avg" 
+python training.py --network 0 --layers_list 120 --input_labels "Radiacao_Avg" "Temp_Cel_Avg" "Potencia_FV_Avg" 
 --output_labels "Potencia_FV_Avg" --input_steps 120 --output_steps 5 
 ```
 > obs: --network 0 para MLP e --network 1 para LSTM.
@@ -30,6 +30,6 @@ python test.py --network 0 --layers_list 120 --input_labels "Radiacao_Avg" "Temp
 ```
 cd ./ai
 
-python training.py --network 0 --layers_list 512 128 64 32 --input_labels "Radiacao_Avg" "Temp_Cel_Avg" "Potencia_FV_Avg" 
+python test.py --network 0 --layers_list 120 --input_labels "Radiacao_Avg" "Temp_Cel_Avg" "Potencia_FV_Avg" 
 --output_labels "Potencia_FV_Avg" --input_steps 120 --output_steps 5
 ```
