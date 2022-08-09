@@ -2,6 +2,7 @@
 from utils import mae_multi, root_mean_square_error, standard_deviation_error
 import pandas as pd
 import numpy as np
+import os
 import argparse,joblib
 import tensorflow as tf
 from keras.models import load_model
@@ -55,6 +56,7 @@ input_labels = args.input_labels
 output_labels = args.output_labels
 n_steps_in = args.input_steps
 n_steps_out = args.output_steps
+version = 1
 
 #%%
 #Testing the model fully trained
@@ -73,24 +75,10 @@ if network == 'lstm':
     output_training = output_test.reshape(output_test.shape[0], int(output_test.shape[1]/out_l), out_l)
 
 
+# Loading the model
+my_dir = os.path.join(".","..","db","models",f"{network}", '_'.join(str(e) for e in layers_list), f"{version}")
 
-save_path = ""
-
-for i in range(len(layers_list)):
-    save_path = save_path + "["+str(layers_list[i])+"]"
-save_path = save_path +"["+str(n_steps_in) + "]"+"["+str(n_steps_out) + "]"
-for i in range(len(input_labels)):
-    save_path = save_path + "["+str(input_labels[i]) + "]" 
-
-# Openning the file which contains the network model
-nn_file = open(f'./../db/saves/{network}/regressor_{network}'+save_path+'.json', 'r')
-nn_structure = nn_file.read()
-nn_file.close()
-# Getting the network structure
-model = tf.keras.models.model_from_json(nn_structure)
-# Reading the weights the putting them  in the network model
-model.load_weights(f'./../db/saves/{network}/pesos_{network}'+save_path+'.h5')
-
+model = tf.keras.models.load_model(my_dir)
 
 predictions = model.predict(input_test)
 

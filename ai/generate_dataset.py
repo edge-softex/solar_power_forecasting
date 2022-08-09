@@ -68,11 +68,18 @@ df_label = df_label.dropna()
 df_label = df_label.reset_index(drop=True)
 
 #Normalization
+my_dir = os.path.join(".","..","db","saves","norm")
+check_folder = os.path.isdir(my_dir)
+
+# If folder doesn't exist, then create it.
+if not check_folder:
+    os.makedirs(check_folder)
+
 for i in input_labels:
     normalizator = preprocessing.MinMaxScaler(feature_range=(0,1))
     normalizator.fit(df_label[i].values.reshape(-1, 1))
     df_label[i] = normalizator.transform(df_label[i].values.reshape(-1, 1))
-    joblib.dump(normalizator, r'./../db/saves/norm/norm'+str(i)+'.save')
+    joblib.dump(normalizator, my_dir+'/norm'+str(i)+'.save')
 
 
 #Splitting the data into training and test data.
@@ -92,8 +99,15 @@ if n_steps_in > 1:
 if n_steps_out > 1:
     outputData = outputData.reshape(outputData.shape[0], outputData.shape[1]*outputData.shape[2])
 
-pd.DataFrame(inputData).to_csv((r'./../db/data/trainingInputData.csv'), index = False)
-pd.DataFrame(outputData).to_csv((r'./../db/data/trainingOutputData.csv'), index = False)
+my_dir = os.path.join(".","..","db","data")
+check_folder = os.path.isdir(my_dir)
+
+# If folder doesn't exist, then create it.
+if not check_folder:
+    os.makedirs(check_folder)
+
+pd.DataFrame(inputData).to_csv((my_dir+'/trainingInputData.csv'), index = False)
+pd.DataFrame(outputData).to_csv((my_dir+'/trainingOutputData.csv'), index = False)
 
 #Splitting the test data into input and output.
 inputData, outputData = split_sequence(testData, n_steps_in, 
@@ -106,6 +120,17 @@ if n_steps_in > 1:
 if n_steps_out > 1:
     outputData = outputData.reshape(outputData.shape[0], outputData.shape[1]*outputData.shape[2])
 
-pd.DataFrame(inputData).to_csv((r'./../db/data/testInputData.csv'), index = False)
-pd.DataFrame(outputData).to_csv((r'./../db/data/testOutputData.csv'), index = False)
+my_dir = os.path.join(".","..","db","data")
+check_folder = os.path.isdir(my_dir)
+
+# If folder doesn't exist, then create it.
+if not check_folder:
+    os.makedirs(check_folder)
+
+pd.DataFrame(inputData).to_csv((my_dir+'/testInputData.csv'), index = False)
+pd.DataFrame(outputData).to_csv((my_dir+'/testOutputData.csv'), index = False)
+
+
+
+
 # %%

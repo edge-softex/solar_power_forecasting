@@ -1,7 +1,7 @@
 #%%
-from utils import mae_multi, root_mean_square_error, standard_deviation_error, init_gpus
+from utils import init_gpus
 import pandas as pd
-import argparse, json, datetime, os
+import argparse, datetime, os
 import tensorflow as tf
 
 init_gpus()
@@ -57,57 +57,35 @@ input_labels = args.input_labels
 output_labels = args.output_labels
 n_steps_in = args.input_steps
 n_steps_out = args.output_steps
+version = 1
 #%%
 #TEMPORARIO
-input_training = pd.read_csv(r'./../db/data/trainingInputData.csv')
+input_training = pd.read_csv(r'./../db/data/testInputData.csv')
 input_training = input_training.values
 
-output_training = pd.read_csv(r'./../db/data/trainingOutputData.csv')
+output_training = pd.read_csv(r'./../db/data/testOutputData.csv')
 output_training = output_training.values
 
 if network == 'lstm':
     in_l = len(input_labels)
     out_l = len(output_labels)
-    input_training = input_training.reshape(input_training.shape[0], int(input_training.shape[1]/in_l), in_l)
+    input_test = input_training.reshape(input_training.shape[0], int(input_training.shape[1]/in_l), in_l)
     output_training = output_training.reshape(output_training.shape[0], int(output_training.shape[1]/out_l), out_l)
-
 #%%
-save_path = ""
+my_dir = os.path.join(".","..","db","models",f"{network}", '_'.join(str(e) for e in layers_list), f"{version}")
 
-for i in range(len(layers_list)):
-    save_path = save_path + "["+str(layers_list[i])+"]"
-save_path = save_path +"["+str(n_steps_in) + "]"+"["+str(n_steps_out) + "]"
-for i in range(len(input_labels)):
-    save_path = save_path + "["+str(input_labels[i]) + "]" 
-
-# Openning the file which contains the network model
-nn_file = open(f'./../db/saves/{network}/regressor_{network}'+save_path+'.json', 'r')
-nn_structure = nn_file.read()
-nn_file.close()
-# Getting the network structure
-model = tf.keras.models.model_from_json(nn_structure)
-# Reading the weights the putting them  in the network model
-model.load_weights(f'./../db/saves/{network}/pesos_{network}'+save_path+'.h5')
+model = tf.keras.models.load_model(my_dir)
 #%%
-# Compilling the network according to the loss_metric
-opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
+es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 20, verbose = 1)
 
-model.compile(optimizer = opt, loss = 'mean_absolute_error', metrics=[mae_multi, standard_deviation_error, root_mean_square_error])  
-es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 10, verbose = 1)
+rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 10, min_lr=1e-7, verbose = 1)
 
-# Reduce the learnning rate when the metric stop improving.
-rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 5, verbose = 1)
+my_dir = os.path.join(".","..","db","models",f"{network}", '_'.join(str(e) for e in layers_list), f"{version}")
 
-my_dir = os.path.join(".","..","db","saves",f"{network}")
-check_folder = os.path.isdir(my_dir)
+mcp =  tf.keras.callbacks.ModelCheckpoint(filepath = my_dir, monitor = 'val_loss', save_best_only= True)
 
-# If folder doesn't exist, then create it.
-if not check_folder:
-    os.makedirs(check_folder)
+log_dir = os.path.join(".","logs",f"{network}", '_'.join(str(e) for e in layers_list), datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
-mcp =  tf.keras.callbacks.ModelCheckpoint(filepath=my_dir+f'/pesos_{network}'+save_path+'.h5', monitor = 'val_loss', save_best_only= True)
-
-log_dir = f"logs/{network}/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 tb_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
 #training and storing the history
@@ -117,30 +95,6 @@ history = model.fit(x = input_training,
                         epochs = 50,
                         batch_size = 512,
                         callbacks = [es,rlr,mcp,tb_callback])
-model_json = model.to_json()
-
-        
-hist = {'loss': str(history.history['loss']),
-        'mae': str(history.history['mae_multi']),
-        'rmse': str(history.history['root_mean_square_error']),
-        'stddev': str(history.history['standard_deviation_error'])
-        }
-
-
-
-j_hist = json.dumps(hist)
-
-my_dir = os.path.join(".","..","db","saves",f"{network}")
-check_folder = os.path.isdir(my_dir)
-
-# If folder doesn't exist, then create it.
-if not check_folder:
-    os.makedirs(check_folder)
-
-with open(my_dir+f'/history_{network}'+save_path+'_retrain_'+ datetime.datetime.now().strftime("%Y%m%d-%H%M%S"), 'w') as json_file:
-    json_file.write(j_hist)
-with open(my_dir+f'/regressor_{network}'+save_path+'.json', 'w') as json_file:
-    json_file.write(model_json)
 
 print("training finished!")
 # %%
