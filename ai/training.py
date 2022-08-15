@@ -18,7 +18,7 @@ parser.add_argument('--network',
   
 parser.add_argument('--layers_list',
                     nargs='+', 
-                    default=[60],
+                    default=[120],
                     help ='Number of neurons each hidden layer will have')
 
 
@@ -102,15 +102,15 @@ else:
 model.add(tf.keras.layers.Dense(units = n_steps_out, activation = 'linear'))    
 
 # Compilling the network according to the loss_metric
-opt = tf.keras.optimizers.Adam(learning_rate=0.001)
+opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 
 model.compile(optimizer = opt, loss = tf.keras.losses.MeanSquaredError(), metrics = [tf.keras.metrics.RootMeanSquaredError()])
 
-es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 20, verbose = 1)
+es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 30, verbose = 1)
 
 # Reduce the learnning rate when the metric stop improving.
-rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 10, min_lr = 1e-7, verbose = 1)
+rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 15, min_lr = 1e-7, verbose = 1)
 
 my_dir = os.path.join(".","..","db","models",f"{network}", '_'.join(str(e) for e in layers_list), f"{version}")
 
@@ -127,7 +127,8 @@ history = model.fit(x = input_training,
                         validation_split=0.2, 
                         epochs = 128,
                         batch_size = 512,
-                        callbacks = [es,rlr,mcp,tb_callback])
+                        #callbacks = [es,rlr,mcp,tb_callback])
+                        callbacks = [es,mcp,tb_callback])
 
 print("training finished!")
 

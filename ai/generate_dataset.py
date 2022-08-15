@@ -17,7 +17,7 @@ parser.add_argument('--network',
   
 parser.add_argument('--input_labels',
                     nargs='+', 
-                    default=["Radiacao_Avg", "Temp_Cel_Avg", "Potencia_FV_Avg"],
+                    default=["Radiacao_Avg", "Temp_Cel_Avg", "Potencia_FV_Avg"],    
                     help ='Input features that will be used to make predictions. (TIMESTAMP, Radiacao_Avg,Temp_Cel_Avg, Temp_Amb_Avg,Tensao_S1_Avg,Corrente_S1_Avg, Potencia_S1_Avg, Tensao_S2_Avg, Corrente_S2_Avg, Potencia_S2_Avg, Potencia_FV_Avg, Demanda_Avg,FP_FV_Avg,Tensao_Rede_Avg')
 
 parser.add_argument('--output_labels',
@@ -68,12 +68,12 @@ df_label = df_label.dropna()
 df_label = df_label.reset_index(drop=True)
 
 #Normalization
-my_dir = os.path.join(".","..","db","saves","norm")
+my_dir = os.path.join(".","..","db","norm")
 check_folder = os.path.isdir(my_dir)
 
 # If folder doesn't exist, then create it.
 if not check_folder:
-    os.makedirs(check_folder)
+    os.makedirs(my_dir)
 
 for i in input_labels:
     normalizator = preprocessing.MinMaxScaler(feature_range=(0,1))
@@ -129,8 +129,5 @@ if not check_folder:
 
 pd.DataFrame(inputData).to_csv((my_dir+'/testInputData.csv'), index = False)
 pd.DataFrame(outputData).to_csv((my_dir+'/testOutputData.csv'), index = False)
-
-
-
 
 # %%
