@@ -104,7 +104,7 @@ check_folder = os.path.isdir(my_dir)
 
 # If folder doesn't exist, then create it.
 if not check_folder:
-    os.makedirs(check_folder)
+    os.makedirs(my_dir)
 
 pd.DataFrame(inputData).to_csv((my_dir+'/trainingInputData.csv'), index = False)
 pd.DataFrame(outputData).to_csv((my_dir+'/trainingOutputData.csv'), index = False)
@@ -125,7 +125,7 @@ check_folder = os.path.isdir(my_dir)
 
 # If folder doesn't exist, then create it.
 if not check_folder:
-    os.makedirs(check_folder)
+    os.makedirs(my_dir)
 
 pd.DataFrame(inputData).to_csv((my_dir+'/testInputData.csv'), index = False)
 pd.DataFrame(outputData).to_csv((my_dir+'/testOutputData.csv'), index = False)
