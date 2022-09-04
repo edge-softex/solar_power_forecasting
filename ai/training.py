@@ -21,6 +21,10 @@ parser.add_argument('--layers_list',
                     default=[120],
                     help ='Number of neurons each hidden layer will have')
 
+parser.add_argument('--dropout_layers',
+                    nargs='+', 
+                    default=[0.5],
+                    help ='Retention probability of each dropout layer the model will have')
 
 parser.add_argument('--input_labels',
                     nargs='+', 
@@ -54,6 +58,7 @@ if args.network == 0:
 else:
     network = 'lstm'
 layers_list = args.layers_list
+dropout_layers = args.dropout_layers
 input_labels = args.input_labels
 output_labels = args.output_labels
 n_steps_in = args.input_steps
@@ -87,6 +92,10 @@ if network == 'mlp':
             model.add(tf.keras.layers.Dense(units = layers_list[i], activation='relu', input_dim=inputDim))
         else:
             model.add(tf.keras.layers.Dense(units = layers_list[i], activation='relu'))
+        
+        if len(dropout_layers) < i:
+            if dropout_layers[i] > 0.0:
+                model.add(tf.keras.layers.Dropout(dropout_layers[i]))
 else:
     for i in range(len(layers_list)):
         if len(layers_list) == 1:
@@ -98,22 +107,23 @@ else:
         else:
             model.add(tf.keras.layers.LSTM(units = layers_list[i], activation='tanh', return_sequences = True))
 
+        if len(dropout_layers) < i:
+            if dropout_layers[i] > 0.0:
+                model.add(tf.keras.layers.Dropout(dropout_layers[i]))
+
 # Output layer
 model.add(tf.keras.layers.Dense(units = n_steps_out, activation = 'linear'))    
 
 # Compilling the network according to the loss_metric
-opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
+opt = tf.keras.optimizers.Adam(learning_rate=0.001)
 
 
 model.compile(optimizer = opt, loss = tf.keras.losses.MeanSquaredError(), metrics = [tf.keras.metrics.RootMeanSquaredError()])
 
-es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 30, verbose = 1)
+es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-8, patience = 15, verbose = 1)
+rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 10, min_lr = 1e-7, verbose = 1)
 
-# Reduce the learnning rate when the metric stop improving.
-rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 15, min_lr = 1e-7, verbose = 1)
-
-my_dir = os.path.join(".","..","db","models",f"{network}", '_'.join(str(e) for e in layers_list), f"{version}")
-
+my_dir = os.path.join(".","..","db","models",f"{network}",f"{n_steps_in}in_{n_steps_out}out" , '_'.join(str(e) for e in layers_list), f"{version}", "model.h5")
 mcp =  tf.keras.callbacks.ModelCheckpoint(filepath = my_dir, monitor = 'val_loss', save_best_only= True)
 
 log_dir = os.path.join(".","logs",f"{network}", '_'.join(str(e) for e in layers_list), datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -126,9 +136,9 @@ history = model.fit(x = input_training,
                         y= output_training,
                         validation_split=0.2, 
                         epochs = 128,
-                        batch_size = 512,
-                        #callbacks = [es,rlr,mcp,tb_callback])
-                        callbacks = [es,mcp,tb_callback])
+                        batch_size = 64,
+                        callbacks = [es,rlr,mcp,tb_callback])
+ 
 
 print("training finished!")
 
