@@ -1,9 +1,10 @@
 #%%
 import tensorflow as tf
 import keras_tuner as kt
+import os
 import argparse
 import pandas as pd
-from utils import mae_multi, root_mean_square_error, standard_deviation_error, init_gpus
+from utils import init_gpus
 
 
 init_gpus()
@@ -71,17 +72,17 @@ if network == 'lstm':
 def build_mlp_model(hp):
     model = tf.keras.Sequential()
     
-    for i in range(hp.Int('num_layers', 1, 8)):
+    for i in range(hp.Int('num_layers', 1, 4)):
         model.add(tf.keras.layers.Dense(units=hp.Int('units_' + str(i),
                                             min_value=32,
                                             max_value=512,
                                             step=32),
                                activation='relu'))
+        model.add(tf.keras.layers.Dropout(hp.Float(f'Dropout_rate_{i}',min_value=0,max_value=0.8,step=0.2)))
     model.add(tf.keras.layers.Dense(n_steps_out, activation='linear'))
     
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(
-            hp.Choice('learning_rate', [1e-3, 1e-4])),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
         loss='mean_absolute_error',
         metrics=['mean_absolute_error'])
     
@@ -92,19 +93,19 @@ def build_lstm_model(hp):
     
     
     model.add(tf.keras.layers.LSTM(hp.Int('input_unit',min_value=32,max_value=256,step=32), activation = 'tanh', return_sequences=True, input_shape=(input_training.shape[1], input_training.shape[2])))
-    
-    for i in range(hp.Int('n_layers', 1, 3)):
+    model.add(tf.keras.layers.Dropout(hp.Float('Dropout_rate_FL',min_value=0,max_value=0.8,step=0.2)))
+
+    for i in range(hp.Int('n_layers', 0, 2, default = 1)):
         model.add(tf.keras.layers.LSTM(hp.Int(f'lstm_{i}_units',min_value=32,max_value=256,step=32), activation = 'tanh', return_sequences=True))
+        model.add(tf.keras.layers.Dropout(hp.Float(f'Dropout_rate__ML_{i}',min_value=0,max_value=0.8,step=0.2)))
     
     model.add(tf.keras.layers.LSTM(hp.Int('last_layer_units',min_value=32,max_value=256,step=32), activation = 'tanh'))
     
-    model.add(tf.keras.layers.Dropout(hp.Float('Dropout_rate',min_value=0,max_value=0.5,step=0.1)))
+    model.add(tf.keras.layers.Dropout(hp.Float('Dropout_rate_LL',min_value=0,max_value=0.8,step=0.2)))
     
     model.add(tf.keras.layers.Dense(n_steps_out, activation='linear'))
     
-    model.compile(loss='mean_absolute_error', metrics=['mean_absolute_error'], optimizer=tf.keras.optimizers.Adam(
-        hp.Choice('learning_rate',
-                  values=[1e-3, 1e-4])))
+    model.compile(loss='mean_absolute_error', metrics=['mean_absolute_error'], optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5))
 
     return model
 
@@ -112,23 +113,35 @@ if network == 'mlp':
     tuner = kt.BayesianOptimization(build_mlp_model, objective='val_mean_absolute_error', max_trials=20, executions_per_trial=1,
                      directory='./logs/tuning/',project_name='mlp_param')
 else:
-    tuner = kt.BayesianOptimization(build_lstm_model, objective='val_mean_absolute_error', max_trials=15, executions_per_trial=1,
+    tuner = kt.BayesianOptimization(build_lstm_model, objective='val_mean_absolute_error', max_trials=20, executions_per_trial=1,
                      directory='./logs/tuning/',project_name='lstm_param')
 
-es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-9, patience = 10, verbose = 1)
+es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-8, patience = 15, verbose = 1)
 
+rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 10, min_lr = 1e-7, verbose = 1)
 
 #%%
 tuner.search_space_summary()
 
 #%%
-tuner.search(input_training, output_training,epochs=128, batch_size = 32,
-     validation_split=0.2, callbacks=[es], verbose=1)
+tuner.search(input_training, output_training,epochs=128, batch_size = 64,
+     validation_split=0.2, callbacks=[es, rlr], verbose=1)
 
 #%%
 tuner.results_summary()
+#%%
+best_hps=tuner.get_best_hyperparameters(num_trials=1)[0]
 
 #%%
-bayes_opt_model_best_model = tuner.get_best_models(num_models=3)
-model = bayes_opt_model_best_model[0]
+model = tuner.hypermodel.build(best_hps)
 
+my_dir = os.path.join(".","..","db","models",f"{network}", "kt_best_model",  "model.h5")
+mcp =  tf.keras.callbacks.ModelCheckpoint(filepath = my_dir, monitor = 'val_loss', save_best_only= True)
+
+history = model.fit(x = input_training,
+                        y= output_training,
+                        validation_split=0.2, 
+                        epochs = 128,
+                        batch_size = 64,
+                        callbacks = [es, rlr, mcp])
+#%%

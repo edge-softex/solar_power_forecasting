@@ -83,7 +83,7 @@ for i in input_labels:
 
 
 #Splitting the data into training and test data.
-trainingData, testData =  model_selection.train_test_split(df_label,test_size = 0.1, shuffle=False)
+trainingData, testData =  model_selection.train_test_split(df_label,test_size = 0.2, shuffle=True)
 trainingData = trainingData.reset_index(drop=True)
 testData = testData.reset_index(drop=True)
 
