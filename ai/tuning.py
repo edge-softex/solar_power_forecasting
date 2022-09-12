@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Hy
 
 parser.add_argument('--network',
                     type = int,
-                    choices={"0", "1"},
+                    choices={"0", "1", "2"},
                     default="1",
                     help ='Neural network topology which the dataset will be prepared for (0. MLP or 1. LSTM).')
   
@@ -44,6 +44,8 @@ args = parser.parse_args()
 
 if args.network == 0:
     network = 'mlp'
+elif args.network == 1:
+    network = 'rnn'
 else:
     network = 'lstm'
 
@@ -57,12 +59,8 @@ input_training = pd.read_csv(r'./../db/data/trainingInputData.csv')
 input_training = input_training.values
 output_training = pd.read_csv(r'./../db/data/trainingOutputData.csv')
 output_training = output_training.values
-input_test = pd.read_csv(r'./../db/data/testInputData.csv')
-input_test = input_test.values
-output_test = pd.read_csv(r'./../db/data/testOutputData.csv')
-output_test = output_test.values
 
-if network == 'lstm':
+if network == 'lstm' or network == 'rnn':
     in_l = len(input_labels)
     out_l = len(output_labels)
     input_training = input_training.reshape(input_training.shape[0], int(input_training.shape[1]/in_l), in_l)
@@ -88,6 +86,27 @@ def build_mlp_model(hp):
     
     return model
 
+def build_rnn_model(hp):
+    model = tf.keras.Sequential()
+    
+    
+    model.add(tf.keras.layers.SimpleRNN(hp.Int('input_unit',min_value=32,max_value=256,step=32), activation = 'tanh', return_sequences=True, input_shape=(input_training.shape[1], input_training.shape[2])))
+    model.add(tf.keras.layers.Dropout(hp.Float('Dropout_rate_FL',min_value=0,max_value=0.8,step=0.2)))
+
+    for i in range(hp.Int('n_layers', 0, 2, default = 1)):
+        model.add(tf.keras.layers.SimpleRNN(hp.Int(f'lstm_{i}_units',min_value=32,max_value=256,step=32), activation = 'tanh', return_sequences=True))
+        model.add(tf.keras.layers.Dropout(hp.Float(f'Dropout_rate__ML_{i}',min_value=0,max_value=0.8,step=0.2)))
+    
+    model.add(tf.keras.layers.SimpleRNN(hp.Int('last_layer_units',min_value=32,max_value=256,step=32), activation = 'tanh'))
+    
+    model.add(tf.keras.layers.Dropout(hp.Float('Dropout_rate_LL',min_value=0,max_value=0.8,step=0.2)))
+    
+    model.add(tf.keras.layers.Dense(n_steps_out, activation='linear'))
+    
+    model.compile(loss='mean_absolute_error', metrics=['mean_absolute_error'], optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3))
+
+    return model
+
 def build_lstm_model(hp):
     model = tf.keras.Sequential()
     
@@ -105,7 +124,7 @@ def build_lstm_model(hp):
     
     model.add(tf.keras.layers.Dense(n_steps_out, activation='linear'))
     
-    model.compile(loss='mean_absolute_error', metrics=['mean_absolute_error'], optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5))
+    model.compile(loss='mean_absolute_error', metrics=['mean_absolute_error'], optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3))
 
     return model
 
@@ -116,9 +135,9 @@ else:
     tuner = kt.BayesianOptimization(build_lstm_model, objective='val_mean_absolute_error', max_trials=20, executions_per_trial=1,
                      directory='./logs/tuning/',project_name='lstm_param')
 
-es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-8, patience = 15, verbose = 1)
+es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-7, patience = 20, verbose = 1)
 
-rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 10, min_lr = 1e-7, verbose = 1)
+rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.2, min_delta=1e-7, patience = 10, min_lr = 1e-7, verbose = 1)
 
 #%%
 tuner.search_space_summary()
