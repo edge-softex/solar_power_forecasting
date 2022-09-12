@@ -94,7 +94,7 @@ def build_rnn_model(hp):
     model.add(tf.keras.layers.Dropout(hp.Float('Dropout_rate_FL',min_value=0,max_value=0.8,step=0.2)))
 
     for i in range(hp.Int('n_layers', 0, 2, default = 1)):
-        model.add(tf.keras.layers.SimpleRNN(hp.Int(f'lstm_{i}_units',min_value=32,max_value=256,step=32), activation = 'tanh', return_sequences=True))
+        model.add(tf.keras.layers.SimpleRNN(hp.Int(f'rnn{i}_units',min_value=32,max_value=256,step=32), activation = 'tanh', return_sequences=True))
         model.add(tf.keras.layers.Dropout(hp.Float(f'Dropout_rate__ML_{i}',min_value=0,max_value=0.8,step=0.2)))
     
     model.add(tf.keras.layers.SimpleRNN(hp.Int('last_layer_units',min_value=32,max_value=256,step=32), activation = 'tanh'))
@@ -131,6 +131,9 @@ def build_lstm_model(hp):
 if network == 'mlp':
     tuner = kt.BayesianOptimization(build_mlp_model, objective='val_mean_absolute_error', max_trials=20, executions_per_trial=1,
                      directory='./logs/tuning/',project_name='mlp_param')
+elif network == 'rnn':
+    tuner = kt.BayesianOptimization(build_rnn_model, objective='val_mean_absolute_error', max_trials=20, executions_per_trial=1,
+                     directory='./logs/tuning/',project_name='rnn_param')
 else:
     tuner = kt.BayesianOptimization(build_lstm_model, objective='val_mean_absolute_error', max_trials=20, executions_per_trial=1,
                      directory='./logs/tuning/',project_name='lstm_param')
