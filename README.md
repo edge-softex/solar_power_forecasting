@@ -24,7 +24,7 @@ python training.py --network 0 --layers_list [120] --input_labels "Radiacao_Avg"
 --output_labels "Potencia_FV_Avg" --input_steps 120 --output_steps 5 
 ```
 > obs: --network 0 for MLP, --network 1 for RNN, and --network 2 for LSTM.
-## Teste
+## Test
 
 ```
 cd ./ai
