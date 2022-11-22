@@ -14,8 +14,8 @@ parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Hy
 parser.add_argument('--network',
                     type = int,
                     choices={"0", "1", "2"},
-                    default="1",
-                    help ='Neural network topology which the dataset will be prepared for (0. MLP or 1. LSTM).')
+                    default="0",
+                    help ='Neural network topology which the dataset will be prepared for (0. MLP, 1. RNN or 2. LSTM).')
   
 
 parser.add_argument('--input_labels',
@@ -164,6 +164,6 @@ history = model.fit(x = input_training,
                         y= output_training,
                         validation_split=0.2, 
                         epochs = 128,
-                        batch_size = 64,
+                        batch_size = 512,
                         callbacks = [es, rlr, mcp])
 #%%

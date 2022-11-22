@@ -5,7 +5,9 @@ import numpy as np
 import os
 import argparse,joblib, csv
 import tensorflow as tf
-from keras.models import load_model
+import matplotlib.pyplot as plt
+from matplotlib import dates 
+import datetime
 #%%
 # Initializing Parser
 parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Model Test')
@@ -13,20 +15,14 @@ parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Mo
 # Adding Argument
 parser.add_argument('--network',
                     type = int,
-                    choices={"0", "1", "2"},
-                    default="1",
-                    help ='Neural network topology which the dataset will be prepared for (0. MLP, 1. RNN or 2. LSTM).')
+                    choices={0, 1},
+                    default=1,
+                    help ='Neural network topology which the dataset will be prepared for (0. MLP or 1. LSTM).')
   
 parser.add_argument('--layers_list',
                     nargs='+', 
-                    default=[512],
+                    default=[120],
                     help ='Number of neurons each hidden layer will have')
-
-
-parser.add_argument('--dropout_layers',
-                    nargs='+', 
-                    default=[],
-                    help ='Retention probability of each dropout layer the model will have')
 
 
 parser.add_argument('--input_labels',
@@ -55,14 +51,9 @@ args = parser.parse_args()
 
 if args.network == 0:
     network = 'mlp'
-elif args.network == 1:
-    network = 'rnn'
 else:
     network = 'lstm'
-
-
 layers_list = args.layers_list
-dropout_layers = args.dropout_layers
 input_labels = args.input_labels
 output_labels = args.output_labels
 n_steps_in = args.input_steps
@@ -79,58 +70,60 @@ input_test = input_test.values
 output_test = pd.read_csv(r'./../db/data/testOutputData.csv')
 output_test = output_test.values
 
-if network == 'lstm' or network == 'rnn':
+if network == 'lstm':
     in_l = len(input_labels)
     out_l = len(output_labels)
     input_test = input_test.reshape(input_test.shape[0], int(input_test.shape[1]/in_l), in_l)
 
 #%%
-# Loading the model
-#my_dir = os.path.join(".","..","db","models",f"{network}", '_'.join(str(e) for e in layers_list), "model.h5")
-my_dir = os.path.join(".","..","db","models",f"{network}",f"{n_steps_in}in_{n_steps_out}out" , '_'.join(str(e) for e in layers_list),'Dropout_'+'_'.join(str(e) for e in dropout_layers), "model.h5")
-#my_dir = os.path.join(".","..","db","models",f"{network}", "kt_best_model","model.h5")
+#my_dir = os.path.join(".","..","db","models",f"{network}", '_'.join(str(e) for e in layers_list), f"{version}")
+my_dir = os.path.join(".","..","db","models",f"{network}", "kt_best_model","model.h5")
 
 
 model = tf.keras.models.load_model(my_dir)
 
-#%%
 predictions = model.predict(input_test)
 
 normalizator = joblib.load(r'./../db/norm/normPotencia_FV_Avg.save')
 
-y = normalizator.inverse_transform(output_test)
-y_hat = normalizator.inverse_transform(predictions)    
+#%%
+shift = 850
 
-mae = mae_multi(y, y_hat).numpy()
-rmse = root_mean_square_error(y, y_hat).numpy()
-stddev = standard_deviation_error(y, y_hat).numpy()
+y = normalizator.inverse_transform(output_test[0+shift:1440+shift])
+y_hat = normalizator.inverse_transform(predictions[0+shift:1440+shift])    
 
+y_true = np.array(y)
+y_pred = np.array(y_hat)
 
-print("Tests evaluation:")
-for i in range(len(mae)):
-    print(str(i+1)+" Output minute:")
-    print(f"Mean Absolute Error (MAE): {mae[i]}")
-    print(f"Root Mean Square Error (RMS): {rmse[i]}")
-    print(f"Standart Deviation: {stddev[i]}")
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Times New Roman']
+plt.rcParams.update({'font.size': 20})
 
-print("Avarege:")
-print(f"Mean Absolute Error (MAE): {np.mean(mae)}")
-print(f"Root Mean Square Error (RMS): {np.mean(rmse)}")
-print(f"Standart Deviation: {np.mean(stddev)}")
-# %%
-#my_dir = os.path.join(".","..","db","results",f"{network}",'_'.join(str(e) for e in layers_list))
-my_dir = os.path.join(".","..","db","results",f"{network}",f"{n_steps_in}in_{n_steps_out}out" , '_'.join(str(e) for e in layers_list),'Dropout_'+'_'.join(str(e) for e in dropout_layers), "model.h5")
-#my_dir = os.path.join(".","..","db","results",f"{network}","kt_best_model")
+t = np.arange(0, len(y_true), 1)
+times=np.array([datetime.datetime(2022, 1, 3, int(p/60), int(p%60), int(0)) for p in t])
+fmtr = dates.DateFormatter("%H:%M")
 
-check_folder = os.path.isdir(my_dir)
-if not check_folder:
-    os.makedirs(my_dir)
+plt.style.use('seaborn-whitegrid')
 
-f = open(my_dir+"/model_results.txt", 'w')
-with f:
+plot_size = y_true.shape[1]
+#%%
+for i in range(plot_size):
+    minute = i + 1
+    fig = plt.figure(figsize=(12,6))
+    ax1=fig.add_subplot(1, 1, 1)
+    ax1.plot(times,y_true[:,i],linestyle='-',color= 'red',label = 'Real', linewidth=1.5)
+    ax1.plot(times,y_pred[:,i],linestyle='--', color= 'royalblue', label = 'Predito', linewidth=2.5,dashes=(1, 2))
+    ax1.xaxis.set_major_formatter(fmtr)
     
-    fnames = ['Model','Mean Absolute Error (MAE)', 'Root Mean Square (RMS)', 'Standart Deviation']
-    writer = csv.DictWriter(f, fieldnames=fnames)    
-    writer.writeheader()
-    writer.writerow({'Model' : f"{network}", 'Mean Absolute Error (MAE)' : np.mean(mae), 'Root Mean Square (RMS)': np.mean(rmse), 'Standart Deviation' : np.mean(stddev)})
+    ax1.tick_params(axis='x', labelsize= 18)
+    ax1.tick_params(axis='y', labelsize= 18)
+    
+    ax1.set_ylabel("Potência (W)", fontsize = 20)
+    ax1.set_xlabel("Hora", fontsize = 20)
+    #plt.title("Gráfico Real x Predito - Minuto "+str(minute), fontsize = 18)
+    plt.legend(fontsize = 'small', loc='upper right')
+    #plt.grid(b=True)
+    #plt.savefig(save_path, dpi=300)
+    plt.savefig(f'previsao_{i+1}.pdf', format="pdf", bbox_inches="tight", dpi = 600)
+
 # %%

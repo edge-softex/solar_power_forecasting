@@ -51,7 +51,8 @@ n_steps_out = args.output_steps
 
 folders = [os.path.join(".","..","db","Dados Sistema 5 kW","Ano 2019"), 
             os.path.join(".","..","db","Dados Sistema 5 kW","Ano 2020"),
-            os.path.join(".","..","db","Dados Sistema 5 kW","Ano 2021")]
+            os.path.join(".","..","db","Dados Sistema 5 kW","Ano 2021"),
+            os.path.join(".","..","db","Dados Sistema 5 kW","Ano 2022")]
     
 
 lst = []
@@ -66,7 +67,7 @@ df_complete = pd.concat(dfs, ignore_index=True)
 df_label = df_complete[input_labels]
 df_label = df_label.dropna()
 df_label = df_label.reset_index(drop=True)
-
+#%%
 #Normalization
 my_dir = os.path.join(".","..","db","norm")
 check_folder = os.path.isdir(my_dir)
@@ -83,7 +84,7 @@ for i in input_labels:
 
 
 #Splitting the data into training and test data.
-trainingData, testData =  model_selection.train_test_split(df_label,test_size = 0.2, shuffle=True)
+trainingData, testData =  model_selection.train_test_split(df_label,test_size = 0.2, shuffle=False)
 trainingData = trainingData.reset_index(drop=True)
 testData = testData.reset_index(drop=True)
 

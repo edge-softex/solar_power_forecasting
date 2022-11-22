@@ -12,10 +12,10 @@ parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Mo
 # Adding Argument
 parser.add_argument('--network',
                     type = int,
-                    choices={0, 1},
-                    default="0",
-                    help ='Neural network topology which the dataset will be prepared for (0. MLP or 1. LSTM).')
-  
+                    choices={"0", "1", "2"},
+                    default="2",
+                    help ='Neural network topology which the dataset will be prepared for (0. MLP, 1. RNN or 2. LSTM).')
+   
 parser.add_argument('--layers_list',
                     nargs='+', 
                     default=[120],
@@ -23,7 +23,7 @@ parser.add_argument('--layers_list',
 
 parser.add_argument('--dropout_layers',
                     nargs='+', 
-                    default=[0.5],
+                    default=[],
                     help ='Retention probability of each dropout layer the model will have')
 
 parser.add_argument('--input_labels',
@@ -55,6 +55,8 @@ args = parser.parse_args()
 
 if args.network == 0:
     network = 'mlp'
+elif args.network == 1:
+    network = 'rnn'
 else:
     network = 'lstm'
 layers_list = args.layers_list
@@ -75,7 +77,7 @@ input_training = input_training.values
 output_training = pd.read_csv(r'./../db/data/trainingOutputData.csv')
 output_training = output_training.values
 
-if network == 'lstm':
+if network == 'lstm' or network == 'rnn':
     in_l = len(input_labels)
     out_l = len(output_labels)
     input_training = input_training.reshape(input_training.shape[0], int(input_training.shape[1]/in_l), in_l)
@@ -93,9 +95,24 @@ if network == 'mlp':
         else:
             model.add(tf.keras.layers.Dense(units = layers_list[i], activation='relu'))
         
-        if len(dropout_layers) < i:
+        if len(dropout_layers) > i:
             if dropout_layers[i] > 0.0:
                 model.add(tf.keras.layers.Dropout(dropout_layers[i]))
+elif network == 'rnn':
+    for i in range(len(layers_list)):
+        for i in range(len(layers_list)):
+            if len(layers_list) == 1:
+                model.add(tf.keras.layers.SimpleRNN(units = layers_list[i], activation='tanh', input_shape=(input_training.shape[1], input_training.shape[2])))
+            elif len(layers_list) > 1 and i == 0:     
+                model.add(tf.keras.layers.SimpleRNN(units = layers_list[i], activation='tanh', input_shape=(input_training.shape[1], input_training.shape[2]), return_sequences=True))
+            elif len(layers_list) > 1 and i == (len(layers_list)-1):
+                model.add(tf.keras.layers.SimpleRNN(units = layers_list[i], activation='tanh'))
+            else:
+                model.add(tf.keras.layers.SimpleRNN(units = layers_list[i], activation='tanh', return_sequences = True))
+
+            if len(dropout_layers) > i:
+                if dropout_layers[i] > 0.0:
+                    model.add(tf.keras.layers.Dropout(dropout_layers[i]))
 else:
     for i in range(len(layers_list)):
         if len(layers_list) == 1:
@@ -107,23 +124,28 @@ else:
         else:
             model.add(tf.keras.layers.LSTM(units = layers_list[i], activation='tanh', return_sequences = True))
 
-        if len(dropout_layers) < i:
+        if len(dropout_layers) > i:
             if dropout_layers[i] > 0.0:
                 model.add(tf.keras.layers.Dropout(dropout_layers[i]))
 
 # Output layer
 model.add(tf.keras.layers.Dense(units = n_steps_out, activation = 'linear'))    
 
+#%%
 # Compilling the network according to the loss_metric
 opt = tf.keras.optimizers.Adam(learning_rate=0.001)
 
 
 model.compile(optimizer = opt, loss = tf.keras.losses.MeanSquaredError(), metrics = [tf.keras.metrics.RootMeanSquaredError()])
 
-es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-8, patience = 15, verbose = 1)
-rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.1, patience = 10, min_lr = 1e-7, verbose = 1)
+es = tf.keras.callbacks.EarlyStopping(monitor ='val_loss', min_delta = 1e-8, patience = 30, verbose = 1)
+rlr = tf.keras.callbacks.ReduceLROnPlateau(monitor = 'val_loss', factor = 0.2, patience = 15, min_lr = 1e-7, verbose = 1)
 
-my_dir = os.path.join(".","..","db","models",f"{network}",f"{n_steps_in}in_{n_steps_out}out" , '_'.join(str(e) for e in layers_list), f"{version}", "model.h5")
+#my_dir = os.path.join(".","..","db","models",f"{network}",f"{n_steps_in}in_{n_steps_out}out" , '_'.join(str(e) for e in layers_list), "model.h5")
+my_dir = os.path.join(".","..","db","models",f"{network}",f"{n_steps_in}in_{n_steps_out}out" , '_'.join(str(e) for e in layers_list),'Dropout_'+'_'.join(str(e) for e in dropout_layers), "model.h5")
+#my_dir = os.path.join(".","..","db","models",f"{network}",f"{n_steps_in}in_{n_steps_out}out" , '_'.join(str(e) for e in layers_list),"TESTE", "model.h5")
+
+
 mcp =  tf.keras.callbacks.ModelCheckpoint(filepath = my_dir, monitor = 'val_loss', save_best_only= True)
 
 log_dir = os.path.join(".","logs",f"{network}", '_'.join(str(e) for e in layers_list), datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -136,7 +158,7 @@ history = model.fit(x = input_training,
                         y= output_training,
                         validation_split=0.2, 
                         epochs = 128,
-                        batch_size = 64,
+                        batch_size = 512,
                         callbacks = [es,rlr,mcp,tb_callback])
  
 

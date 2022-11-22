@@ -1,11 +1,16 @@
 #%%
-from utils import mae_multi, root_mean_square_error, standard_deviation_error
+import sys
+sys.path.append("..") 
+
+from utils import *
 import pandas as pd
 import numpy as np
 import os
 import argparse,joblib, csv
 import tensorflow as tf
-from keras.models import load_model
+import matplotlib.pyplot as plt
+from matplotlib import dates 
+import datetime
 #%%
 # Initializing Parser
 parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Model Test')
@@ -14,19 +19,13 @@ parser = argparse.ArgumentParser(description ='Softex - PV Power Predection - Mo
 parser.add_argument('--network',
                     type = int,
                     choices={"0", "1", "2"},
-                    default="1",
+                    default="2",
                     help ='Neural network topology which the dataset will be prepared for (0. MLP, 1. RNN or 2. LSTM).')
   
 parser.add_argument('--layers_list',
                     nargs='+', 
-                    default=[512],
+                    default=[120],
                     help ='Number of neurons each hidden layer will have')
-
-
-parser.add_argument('--dropout_layers',
-                    nargs='+', 
-                    default=[],
-                    help ='Retention probability of each dropout layer the model will have')
 
 
 parser.add_argument('--input_labels',
@@ -62,16 +61,45 @@ else:
 
 
 layers_list = args.layers_list
-dropout_layers = args.dropout_layers
 input_labels = args.input_labels
 output_labels = args.output_labels
 n_steps_in = args.input_steps
 n_steps_out = args.output_steps
-version = 1
+
+input_scalers = []
+for i in input_labels:
+    input_scalers.append(joblib.load(f"./../db/norm/norm{i}.save"))
 
 #%%
-#Testing the model fully trained
-#Reading the test input data
+'''
+folders = [os.path.join(".","..","db","Dados Sistema 5 kW","Ano 2019"), 
+            os.path.join(".","..","db","Dados Sistema 5 kW","Ano 2020"),
+            os.path.join(".","..","db","Dados Sistema 5 kW","Ano 2021"),
+            os.path.join(".","..","db","Dados Sistema 5 kW","Ano 2022")]
+    
+
+lst = []
+for i in range(len(folders)):
+    lst = lst + get_list_of_files(folders[i])
+
+dfs = (read_dat_file(f) for f in lst)
+df_complete = pd.concat(dfs, ignore_index=True)
+#%%
+df_complete['TIMESTAMP'] = pd.to_datetime(df_complete['TIMESTAMP'])  
+#%%
+start_date = '2022-4-1'
+end_date = '2022-4-2'
+mask = (df_complete['TIMESTAMP'] >= start_date) & (df_complete['TIMESTAMP'] < end_date)
+df_day = df_complete.loc[mask]
+df_day = df_day[input_labels]
+#%%
+for i in range(len(input_labels)):
+    scaler = input_scalers[i]
+    df_day[input_labels[i]] = scaler.transform(df_day[input_labels[i]].values.reshape(-1, 1))
+
+input_test, output_test  = split_sequence(df_day, n_steps_in, n_steps_out,input_labels,output_labels)
+'''
+#%%
 input_test = pd.read_csv(r'./../db/data/testInputData.csv')
 #Getting the column values
 input_test = input_test.values
@@ -86,51 +114,55 @@ if network == 'lstm' or network == 'rnn':
 
 #%%
 # Loading the model
-#my_dir = os.path.join(".","..","db","models",f"{network}", '_'.join(str(e) for e in layers_list), "model.h5")
-my_dir = os.path.join(".","..","db","models",f"{network}",f"{n_steps_in}in_{n_steps_out}out" , '_'.join(str(e) for e in layers_list),'Dropout_'+'_'.join(str(e) for e in dropout_layers), "model.h5")
+my_dir = os.path.join(".","..","db","models",f"{network}", '_'.join(str(e) for e in layers_list), "model.h5")
 #my_dir = os.path.join(".","..","db","models",f"{network}", "kt_best_model","model.h5")
-
 
 model = tf.keras.models.load_model(my_dir)
 
-#%%
 predictions = model.predict(input_test)
 
+#%%
 normalizator = joblib.load(r'./../db/norm/normPotencia_FV_Avg.save')
 
-y = normalizator.inverse_transform(output_test)
+y = normalizator.inverse_transform(output_test.reshape(output_test.shape[0], output_test.shape[1]))
 y_hat = normalizator.inverse_transform(predictions)    
 
-mae = mae_multi(y, y_hat).numpy()
-rmse = root_mean_square_error(y, y_hat).numpy()
-stddev = standard_deviation_error(y, y_hat).numpy()
+y_true = np.array(y)
+y_pred = np.array(y_hat)
+
+#%%
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Times New Roman']
+plt.rcParams.update({'font.size': 20})
+
+plt.style.use('seaborn-whitegrid')
+
+plot_size = y_true.shape[1]
+#%%
+#my_dir = os.path.join(".","..","db","plots","scatter",f"{network}","kt_best_model", f"{start_date}")
+my_dir = os.path.join(".","..","db","plots","scatter",f"{network}","kt_best_model")
 
 
-print("Tests evaluation:")
-for i in range(len(mae)):
-    print(str(i+1)+" Output minute:")
-    print(f"Mean Absolute Error (MAE): {mae[i]}")
-    print(f"Root Mean Square Error (RMS): {rmse[i]}")
-    print(f"Standart Deviation: {stddev[i]}")
-
-print("Avarege:")
-print(f"Mean Absolute Error (MAE): {np.mean(mae)}")
-print(f"Root Mean Square Error (RMS): {np.mean(rmse)}")
-print(f"Standart Deviation: {np.mean(stddev)}")
-# %%
-#my_dir = os.path.join(".","..","db","results",f"{network}",'_'.join(str(e) for e in layers_list))
-my_dir = os.path.join(".","..","db","results",f"{network}",f"{n_steps_in}in_{n_steps_out}out" , '_'.join(str(e) for e in layers_list),'Dropout_'+'_'.join(str(e) for e in dropout_layers), "model.h5")
-#my_dir = os.path.join(".","..","db","results",f"{network}","kt_best_model")
-
-check_folder = os.path.isdir(my_dir)
-if not check_folder:
+if not os.path.exists(my_dir):
     os.makedirs(my_dir)
-
-f = open(my_dir+"/model_results.txt", 'w')
-with f:
+#%%
+plot_size = y_true.shape[1]
+for i in range(plot_size):
+    minute = i + 1 
+    fig = plt.figure(figsize=(8,8))
+    ax1=fig.add_subplot(1, 1, 1)
+    ax1.scatter(y_true[:,i], y_pred[:,i], s=1, c='b')
+    ax1.plot(y_true[:,i], y_true[:,i], color = 'r')
     
-    fnames = ['Model','Mean Absolute Error (MAE)', 'Root Mean Square (RMS)', 'Standart Deviation']
-    writer = csv.DictWriter(f, fieldnames=fnames)    
-    writer.writeheader()
-    writer.writerow({'Model' : f"{network}", 'Mean Absolute Error (MAE)' : np.mean(mae), 'Root Mean Square (RMS)': np.mean(rmse), 'Standart Deviation' : np.mean(stddev)})
+    ax1.tick_params(axis='x', labelsize= 18)
+    ax1.tick_params(axis='y', labelsize= 18)
+    
+    ax1.set_ylabel("Predicted Power (W)", fontsize = 20)
+    ax1.set_xlabel("Real Power (W)", fontsize = 20)
+    
+    plt.xlim(0,5000)
+    plt.ylim(0,5000)
+    #plt.grid(b=True)
+    plt.savefig(my_dir+f'/scatter_{i+1}.pdf', format="pdf", bbox_inches="tight", dpi = 600)
+
 # %%
