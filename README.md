@@ -16,6 +16,12 @@ cd ./ai
 python generate_dataset.py --layers_list [120] --input_labels "Radiacao_Avg" "Temp_Cel_Avg" "Potencia_FV_Avg" 
 --output_labels "Potencia_FV_Avg" --input_steps 120 --output_steps 5 
 ```
+
+## Models
+Download the models and normalizators at: https://drive.google.com/file/d/18GBEGzRjh_b6ASN_o4r5ZiLYbm9oR8ZR/view?usp=sharing
+
+Extract and store in ./db
+
 ## Training
 ```
 cd ./ai
