@@ -18,7 +18,7 @@ python generate_dataset.py --layers_list [120] --input_labels "Radiacao_Avg" "Te
 ```
 
 ## Models
-Download the models and normalizators at: https://drive.google.com/file/d/18GBEGzRjh_b6ASN_o4r5ZiLYbm9oR8ZR/view?usp=sharing
+Download the models and normalizators at: https://drive.google.com/file/d/18GBEGzRjh_b6ASN_o4r5ZiLYbm9oR8ZR/view?usp=share_link
 
 Extract and store in ./db
 
